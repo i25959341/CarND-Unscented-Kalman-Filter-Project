@@ -191,7 +191,7 @@ int main(int argc, char* argv[]) {
     out_file_ << gt_pack_list[k].gt_values_(3) << "\t";
 
     // output the NIS values
-    
+
     if (measurement_pack_list[k].sensor_type_ == MeasurementPackage::LASER) {
       out_file_ << ukf.NIS_laser_ << "\n";
     } else if (measurement_pack_list[k].sensor_type_ == MeasurementPackage::RADAR) {
@@ -206,9 +206,9 @@ int main(int argc, char* argv[]) {
     float y_estimate_ = ukf.x_(1);
     float vx_estimate_ = ukf.x_(2) * cos(ukf.x_(3));
     float vy_estimate_ = ukf.x_(2) * sin(ukf.x_(3));
-    
+
     ukf_x_cartesian_ << x_estimate_, y_estimate_, vx_estimate_, vy_estimate_;
-    
+
     estimations.push_back(ukf_x_cartesian_);
     ground_truth.push_back(gt_pack_list[k].gt_values_);
 

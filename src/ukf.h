@@ -32,6 +32,8 @@ public:
   ///* predicted sigma points matrix
   MatrixXd Xsig_pred_;
 
+  MatrixXd Xsig_aug_;
+
   ///* time when the state is true, in us
   long long time_us_;
 
@@ -65,6 +67,8 @@ public:
   ///* Augmented state dimension
   int n_aug_;
 
+  int n_sig_;
+
   ///* Sigma point spreading parameter
   double lambda_;
 
@@ -73,6 +77,22 @@ public:
 
   ///* the current NIS for laser
   double NIS_laser_;
+
+  VectorXd x_aug_;
+
+  MatrixXd P_aug_;
+
+  int n_z_radar_;   // 3
+
+  int n_z_laser_;
+
+  MatrixXd  Q_;
+  MatrixXd  R_laser_;
+  MatrixXd  R_radar_;
+
+  long long previous_timestamp_;
+
+
 
   /**
    * Constructor
@@ -84,6 +104,7 @@ public:
    */
   virtual ~UKF();
 
+  void GenerateSigmaPoints(MatrixXd* Xsig_out);
   /**
    * ProcessMeasurement
    * @param meas_package The latest measurement data of either radar or laser
