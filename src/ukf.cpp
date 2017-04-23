@@ -25,7 +25,7 @@ UKF::UKF() {
     P_ = MatrixXd(5, 5);
 
     // Process noise standard deviation longitudinal acceleration in m/s^2
-    std_a_      = 1.0; // orig 30; tested with 0.6 - 3
+    std_a_      = 0.8; // orig 30; tested with 0.6 - 3
 
     // Process noise standard deviation yaw acceleration in rad/s^2
     std_yawdd_  = 0.59;  // orig 30;
@@ -44,6 +44,14 @@ UKF::UKF() {
 
     // Radar measurement noise standard deviation radius change in m/s
     std_radrd_  = 0.3;  // from EKF project
+
+    /**
+    TODO:
+
+    Complete the initialization. See ukf.h for other member properties.
+
+    Hint: one or more values initialized above might be wildly off...
+    */
 
     is_initialized_ = false;
 
@@ -68,8 +76,8 @@ UKF::UKF() {
     P_      = MatrixXd(n_x_, n_x_);   // 5x5
     P_ <<   1, 0, 0, 0, 0,
             0, 1, 0, 0, 0,
-            0, 0, 1000, 0, 0,
-            0, 0, 0, 100, 0,
+            0, 0, 700, 0, 0,
+            0, 0, 0, 70, 0,
             0, 0, 0, 0, 1;
 
     P_aug_   = MatrixXd(n_aug_, n_aug_);  // 7x7
@@ -105,6 +113,7 @@ UKF::UKF() {
     R_laser_  <<  std_laspx_ * std_laspx_, 0,
             0, std_laspy_ * std_laspy_;
 
+
 }
 
 UKF::~UKF() {}
@@ -134,15 +143,6 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
 
             double vx = rhodot * cos(phi);
             double vy = rhodot * sin(phi);
-
-            if(fabs(px) < 0.0001) {
-                px        = 1;
-                P_(0, 0)  = 100;
-            }
-            if(fabs(py) < 0.0001) {
-                py        = 1;
-                P_(1,1)   = 100;
-            }
 
             x_ << px, py, rhodot, 0.0, 0.0;
         } else if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
