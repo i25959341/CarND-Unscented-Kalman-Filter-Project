@@ -12,76 +12,98 @@ using std::vector;
  * Initializes Unscented Kalman filter
  */
 UKF::UKF() {
-    is_initialized_ = false;
+    // if this is false, laser measurements will be ignored (except during init)
+    use_laser_ = true;
 
-    n_x_ = 5;
-    n_aug_ = 7;
+    // if this is false, radar measurements will be ignored (except during init)
+    use_radar_ = true;
+
+    // initial state vector
+    x_ = VectorXd(5);
+
+    // initial covariance matrix
+    P_ = MatrixXd(5, 5);
+
+    // Process noise standard deviation longitudinal acceleration in m/s^2
+    std_a_      = 1.0; // orig 30; tested with 0.6 - 3
+
+    // Process noise standard deviation yaw acceleration in rad/s^2
+    std_yawdd_  = 0.59;  // orig 30;
+
+    // Laser measurement noise standard deviation position1 in m
+    std_laspx_  = 0.15; // from EKF project
+
+    // Laser measurement noise standard deviation position2 in m
+    std_laspy_  = 0.15; // from EKF project
+
+    // Radar measurement noise standard deviation radius in m
+    std_radr_   = 0.3;  // from EKF project
+
+    // Radar measurement noise standard deviation angle in rad
+    std_radphi_ = 0.03; // from EKF project
+
+    // Radar measurement noise standard deviation radius change in m/s
+    std_radrd_  = 0.3;  // from EKF project
+
+    is_initialized_ = false;
 
     previous_timestamp_ = 0;
 
-    lambda_ = 3 - n_aug_;  // sigma point spreading parameter
-    n_sig_ = 2 * n_aug_ + 1;
+    // Sigma points
+    n_x_    = 5;
+    n_aug_  = n_x_ + 2;
+    lambda_ = 3 - n_aug_;
+    n_sig_  = 2 * n_aug_ + 1;   // 15 sigma points
 
-    // Process noise standard deviation longitudinal acceleration in m/s^2
-    std_a_ = 0.8;
+    // init state vector
+    x_      = VectorXd(n_x_);       // size 5
+    x_aug_   = VectorXd(n_aug_);     // size 7
 
-    // Process noise standard deviation yaw acceleration in rad/s^2
-    std_yawdd_ = 0.6;
+    // Noise covar matrix
+    Q_      = MatrixXd(2, 2);       // 2x2
+    Q_  <<  std_a_ * std_a_, 0,
+            0, std_yawdd_ * std_yawdd_;
 
-    // Laser measurement noise standard deviation position1 in m
-    std_laspx_ = 0.15;
+    // init covar matrix
+    P_      = MatrixXd(n_x_, n_x_);   // 5x5
+    P_ <<   1, 0, 0, 0, 0,
+            0, 1, 0, 0, 0,
+            0, 0, 1000, 0, 0,
+            0, 0, 0, 100, 0,
+            0, 0, 0, 0, 1;
 
-    // Laser measurement noise standard deviation position2 in m
-    std_laspy_ = 0.15;
-
-    // Radar measurement noise standard deviation radius in m
-    std_radr_ = 0.3;
-
-    // Radar measurement noise standard deviation angle in rad
-    std_radphi_ = 0.03;
-
-    // Radar measurement noise standard deviation radius change in m/s
-    std_radrd_ = 0.3;
-
-
-    x_ = VectorXd(n_x_);       // size 5
-    x_aug_ = VectorXd(n_aug_);     // size 7
-
-    Q_ = MatrixXd(2, 2);
-    Q_ << std_a_ * std_a_, 0.0,
-            0.0, std_yawdd_ * std_yawdd_;
-
-    P_ = MatrixXd(n_x_, n_x_);
-    P_ << 1, 0.0, 0.0, 0.0, 0.0,
-            0.0, 1.0, 0.0, 0.0, 0.0,
-            0.0, 0.0, 1000.0, 0.0, 0.0,
-            0.0, 0.0, 0.0, 100.0, 0.0,
-            0.0, 0.0, 0.0, 0.0, 1.0;
-
-    P_aug_ = MatrixXd(n_aug_, n_aug_);
+    P_aug_   = MatrixXd(n_aug_, n_aug_);  // 7x7
     P_aug_.fill(0.0);
     P_aug_.topLeftCorner(n_x_, n_x_) = P_;
-    P_aug_.bottomRightCorner(2, 2) = Q_;
+    P_aug_.bottomRightCorner(2, 2)   = Q_;
 
-    weights_ = VectorXd(n_sig_);   // 15 sigma points
+    // init weights_
+    weights_    = VectorXd(n_sig_);   // 15 sigma points
     weights_(0) = double(lambda_ / (lambda_ + n_aug_));
-    for (int i = 1; i < 2 * n_aug_ + 1; i++) {
+    for (int i=1; i < 2*n_aug_ + 1; i++)
+    {
         weights_(i) = double(0.5 / (lambda_ + n_aug_));
     }
-    Xsig_aug_ = MatrixXd(n_aug_, n_sig_); // 7x15
-    Xsig_pred_ = MatrixXd(n_x_, n_sig_);   // 5x15
 
-    n_z_radar_ = 3;
-    R_radar_ = MatrixXd(n_z_radar_, n_z_radar_);
-    R_radar_ << std_radr_ * std_radr_, 0.0, 0.0,
-            0.0, std_radphi_ * std_radphi_, 0.0,
-            0.0, 0.0, std_radrd_ * std_radrd_;
+    // sigma points matrix
+    Xsig_aug_   = MatrixXd(n_aug_, n_sig_); // 7x15
+    Xsig_pred_  = MatrixXd(n_x_, n_sig_);   // 5x15
 
+    // For Radar Updates
+    n_z_radar_  = 3;
+
+    R_radar_    = MatrixXd(n_z_radar_, n_z_radar_);
+    R_radar_  <<  std_radr_ * std_radr_, 0, 0,
+            0, std_radphi_ * std_radphi_, 0,
+            0, 0, std_radrd_ * std_radrd_;
+
+    // Laser Updates
     n_z_laser_ = 2;
-    R_laser_ = MatrixXd(2, 2);
-    R_laser_ << std_laspx_ * std_laspx_, 0.0,
-            0.0, std_laspy_ * std_laspy_;
 
+
+    R_laser_    = MatrixXd(2, 2);
+    R_laser_  <<  std_laspx_ * std_laspx_, 0,
+            0, std_laspy_ * std_laspy_;
 
 }
 
@@ -293,18 +315,21 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
         double cosv = cos(yaw) * v;
         double sinv = sin(yaw) * v;
 
-        // measurement model
-        Zsig(0, i) = sqrt(p_x * p_x + p_y * p_y);
+        double rho1   = sqrt( pow(p_x, 2) + pow(p_y, 2) );
+        double phi    = 0.0;
+
         if (fabs(p_x) > 0.001) {
-            Zsig(1, i) = atan2(p_y, p_x);
-        } else {
-            Zsig(1, i) = 0.0;
+            phi = atan2(p_y, p_x);
         }
-        if (fabs(sqrt(p_x * p_x + p_y * p_y)) > 0.001) {
-            Zsig(2, i) = (p_x * cosv + p_y * sinv) / sqrt(p_x * p_x + p_y * p_y);
-        } else {
-            Zsig(2, i) = 0.0;
+        double rhodot = 0.0;
+        // rhodot = (p_x * cosv + p_y * sinv) / rho1;
+        if (fabs(rho1) > 0.001) {
+            rhodot = (p_x * cosv + p_y * sinv) / rho1;
         }
+
+        Zsig(0, i)   = rho1;   // rho1;               // rho
+        Zsig(1, i)   = phi;    // atan2(p_y, p_x);    // phi
+        Zsig(2, i)   = rhodot; // (p_x * cosv + p_y * sinv) / rho1; // rhodot
     }
 
     VectorXd z_pred = VectorXd(n_z_radar_);
@@ -314,23 +339,30 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
     }
     MatrixXd S = MatrixXd(n_z_radar_, n_z_radar_); // dim 3x3
     S.fill(0.0);
+
     MatrixXd Tc = MatrixXd(n_x_, n_z_radar_);   // dim 5x3
     Tc.fill(0.0);
 
     for (int i = 0; i < n_sig_; i++) {
         VectorXd z_diff = Zsig.col(i) - z_pred;
+
         while (z_diff(1) > M_PI) z_diff(1) -= 2. * M_PI;
         while (z_diff(1) < -M_PI) z_diff(1) += 2. * M_PI;
 
         S = S + weights_(i) * z_diff * z_diff.transpose();
+
         VectorXd x_diff = Xsig_pred_.col(i) - x_;
+
         while (x_diff(3) > M_PI) x_diff(3) -= 2. * M_PI;
         while (x_diff(3) < -M_PI) x_diff(3) += 2. * M_PI;
+
         Tc = Tc + weights_(i) * x_diff * z_diff.transpose();
     }
+
     S = S + R_radar_;
 
     MatrixXd K = Tc * S.inverse();
+
     VectorXd z_real = meas_package.raw_measurements_; // size 3
     VectorXd z_diff = z_real - z_pred;
 
